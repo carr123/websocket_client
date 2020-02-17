@@ -1,0 +1,22 @@
+
+	bool bRet = false;
+	ITCPSocket* p = createTCPSocket();
+	bRet = p->connectHost("www.baidu.com", 80);
+
+	std::string sz;
+	sz = "GET / HTTP/1.1\r\n"
+		   "Host:www.baidu.com\r\n"
+		   "User-Agent: Opera/9.80 (Windows NT 6.1; Edition IBIS) Presto/2.12.388 Version/12.15\r\n"
+		   "Accept: text/html, application/xml;q=0.9, application/xhtml+xml, image/png, image/webp, image/jpeg, image/gif, image/x-xbitmap, */*;q=0.1\r\n"
+		   "Accept-Language: zh-CN,zh;q=0.9,en;q=0.8\r\n"
+		   "Connection:keep-alive\r\n\r\n";			
+	bRet = p->write(sz.c_str(), sz.size());
+
+	char buff[1700] = {0};
+
+	int nRead = p->read(buff, 1700);
+	 nRead = p->read(buff+nRead, 1700-nRead);
+
+	p->close();
+	p->Release();
+	

@@ -1,0 +1,67 @@
+void HelloWorld::createWebSock()
+{
+	IWebSockClient* pWS = createWebSockClient();
+	bool bRet = pWS->parseURL("wss://127.0.0.1:8888/ws/shuai");
+
+	auto receiver = [=](int tag){
+	
+	  //尝试连接服务器3次
+		bool bOK = false;
+		for (int i = 0; i < 3; i++) {
+			bOK = pWS->connect();
+			if (bOK){
+				break;;
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+		}
+
+		if (!bOK){
+			return;
+		}
+
+		//发送线程，从发送队列取消息发送
+		auto sender = [=](){
+			std::string szData;
+			bool bOK = false;
+			while (true)
+			{
+				if (!pWS->isConnected()) {
+					break;
+				}
+
+				szData.clear();
+				bOK = m_pWSSendQ->TryGet(&szData);
+				if (bOK){
+					pWS->sendBytes(szData.c_str(), szData.size());
+				}else{
+					m_pWSSendQ->WaitEvent(); //没消息则等待
+				}
+			}
+		};
+
+		std::thread t1(sender);
+
+		IWSFrame* pFrame = 0;
+		while (pFrame = pWS->readFrame())
+		{
+			if (m_pWSRecvQ->Size() > 20){
+				 std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+			}
+			m_pWSRecvQ->PushBack(pFrame); //投递消息到接收队列
+		}
+
+		m_pWSSendQ->PutNull();
+
+		t1.join();
+	};
+
+	auto quitFun = [=](int tag){
+		pWS->close();
+	};
+
+	auto exitCleaner = [=](int tag){
+		pWS->Release();
+	};
+
+	m_pTasks->addTask(receiver, quitFun, exitCleaner);
+}
